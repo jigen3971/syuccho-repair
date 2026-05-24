@@ -1,0 +1,252 @@
+body{
+  margin:0;
+  background:#d1d5db;
+  font-family:sans-serif;
+  color:#111827;
+}
+
+.top-nav{
+  position:sticky;
+  top:0;
+  z-index:100;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px;
+  background:#111827;
+  color:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,0.25);
+}
+
+.top-nav h1{
+  margin:0;
+  font-size:24px;
+  font-weight:bold;
+}
+
+.nav-btn{
+  border:none;
+  background:none;
+  color:#fff;
+  font-size:24px;
+}
+
+.hidden{
+  visibility:hidden;
+}
+
+.screen{
+  display:none;
+  padding:16px;
+}
+
+.screen.active{
+  display:block;
+}
+
+.month-nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+
+.month-btn{
+  width:44px;
+  height:44px;
+  border:none;
+  border-radius:50%;
+  background:#ff6b00;
+  color:#fff;
+  font-size:24px;
+  font-weight:bold;
+}
+
+.cal-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+}
+
+.cal-header{
+  text-align:center;
+  font-weight:bold;
+  padding:10px 0;
+  color:#111827;
+}
+
+.cal-day{
+  background:#ffffff;
+  border-radius:14px;
+  min-height:78px;
+  padding:8px;
+  position:relative;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+}
+
+.cal-day.today{
+  border:2px solid #ff6b00;
+}
+
+.day-num{
+  font-size:16px;
+  font-weight:bold;
+}
+
+.day-dot{
+  width:10px;
+  height:10px;
+  background:#ff6b00;
+  border-radius:50%;
+  position:absolute;
+  right:8px;
+  bottom:8px;
+}
+
+.empty{
+  background:none;
+  box-shadow:none;
+}
+
+.visit-card{
+  background:#fff;
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.08);
+}
+
+.vc-name{
+  font-size:20px;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+
+.vc-meta{
+  font-size:14px;
+  color:#4b5563;
+  margin-bottom:4px;
+}
+
+.form-section{
+  background:#fff;
+  border-radius:20px;
+  padding:18px;
+  margin-bottom:18px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.08);
+}
+
+.form-section h3{
+  margin-top:0;
+  margin-bottom:14px;
+  font-size:20px;
+  color:#111827;
+}
+
+.field-label{
+  display:block;
+  margin-top:14px;
+  margin-bottom:6px;
+  font-size:14px;
+  font-weight:bold;
+  color:#374151;
+}
+
+input,
+textarea,
+select{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:1px solid #cbd5e1;
+  box-sizing:border-box;
+  font-size:16px;
+  background:#f9fafb;
+}
+
+textarea{
+  min-height:110px;
+}
+
+.check-label{
+  display:block;
+  margin-top:14px;
+  font-size:16px;
+}
+
+.btn{
+  border:none;
+  border-radius:14px;
+  padding:14px;
+  font-size:16px;
+  font-weight:bold;
+  margin-top:12px;
+}
+
+.btn-save{
+  width:100%;
+  background:#ff6b00;
+  color:#fff;
+}
+
+.btn-gps{
+  flex:1;
+  background:#2563eb;
+  color:#fff;
+}
+
+.btn-maps{
+  flex:1;
+  background:#16a34a;
+  color:#fff;
+}
+
+.btn-record{
+  width:100%;
+  background:#111827;
+  color:#fff;
+}
+
+.btn-delete-visit{
+  width:100%;
+  background:#dc2626;
+  color:#fff;
+}
+
+.btn-row{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+
+.fab{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  width:64px;
+  height:64px;
+  border:none;
+  border-radius:50%;
+  background:#111827;
+  color:#fff;
+  font-size:34px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.3);
+}
+
+.note{
+  color:#6b7280;
+  font-size:13px;
+}
+
+#toast{
+  position:fixed;
+  left:50%;
+  bottom:30px;
+  transform:translateX(-50%);
+  background:#111827;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:12px;
+  display:none;
+  z-index:999;
+}
