@@ -1,4 +1,4 @@
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzCshuCrW2bJlduhmZTNzm8PZhuqYUNgAJre6X4li462vP9zjfH88SADGm6Rl8vwBOd/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzCshuCrW2bJlduhmZTNzm8PZhuqYUNgAJre6X4Ii462vP9zjfH88SADGm6Rl8vwBOd/exec";
 const STORE_KEY = "syuccho_repair_v1";
 
 function getData() {
