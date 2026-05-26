@@ -6,510 +6,168 @@
   <title>出張修理くん</title>
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-<nav class="top-nav">
-  <button id="btn-back" class="nav-btn hidden" onclick="goBack()">&#8592;</button>
-
-  <h1 id="page-title">出張修理くん</h1>
-
-  <button id="btn-customers" class="nav-btn" onclick="showCustomers()">&#128101;</button>
-</nav>
-
-<div id="screen-calendar" class="screen active">
-
-  <div class="month-nav">
-    <button id="prev-month" class="month-btn" onclick="prevMonth()">&#8249;</button>
-
-    <h2 id="month-label"></h2>
-
-    <button id="next-month" class="month-btn" onclick="nextMonth()">&#8250;</button>
-  </div>
-
-  <div id="cal-grid" class="cal-grid"></div>
-
-</div>
-
-<div id="screen-day" class="screen">
-
-  <h2 id="day-title" class="day-header"></h2>
-
-  <div id="visit-list"></div>
-
-  <button class="fab" onclick="showAddForm()">+</button>
-
-  <div style="height:100px;"></div>
-
-</div>
-
-<div id="screen-form" class="screen">
-
-  <div class="form-section">
-
-    <h3>出張先・GPS</h3>
-
-    <label class="field-label">相手先会社名</label>
-    <input type="text" id="f-company" placeholder="例：〇〇運送">
-
-    <label class="field-label">担当者名</label>
-    <input type="text" id="f-person" placeholder="例：佐藤さん">
-
-    <label class="field-label">電話番号</label>
-    <input type="tel" id="f-phone" placeholder="例：090-0000-0000">
-
-    <label class="field-label">住所</label>
-    <input type="text" id="f-address" placeholder="例：福島県郡山市〇〇1-2-3">
-
-    <div class="btn-row">
-      <button class="btn btn-maps" onclick="openAddressMaps()">地図で開く</button>
-
-      <button class="btn btn-gps" onclick="getGPS()">現在地取得</button>
-    </div>
-
-    <input
-      type="text"
-      id="f-gps"
-      placeholder="GPS座標（自動取得）"
-      readonly
-      style="font-size:12px;color:#888;"
-    >
-
-  </div>
-
-  <div class="form-section">
-
-    <h3>車両情報</h3>
-
-    <label class="field-label">作業時刻</label>
-    <input type="time" id="f-time">
-
-    <label class="field-label">車名</label>
-    <input type="text" id="f-car" placeholder="例：プリウス、ハイエース">
-    <label class="field-label">自社担当者</label>
-<input type="text" id="f-staff" placeholder="例：佐藤">
-
-    <label class="field-label">走行距離</label>
-    <input type="number" id="f-distance" placeholder="例：85000">
-
-  </div>
-
-  <div class="form-section">
-
-    <h3>修理内容</h3>
-
-    <label class="check-label">
-      <input type="checkbox" id="f-electric">
-      電気まわり
-    </label>
-
-    <label class="check-label">
-      <input type="checkbox" id="f-oil">
-      オイル交換
-    </label>
-
-    <label class="field-label">オイル量</label>
-    <input type="text" id="f-oil-amount" placeholder="例：4.5L">
-
-    <label class="check-label">
-      <input type="checkbox" id="f-oil-filter">
-      オイルフィルター交換
-    </label>
-
-    <label class="check-label">
-      <input type="checkbox" id="f-other">
-      その他
-    </label>
-
-  </div>
-
-  <div class="form-section">
-
-    <h3>一言メモ</h3>
-
-    <textarea
-      id="f-memo"
-      placeholder="修理内容・気づいたことを入力..."
-    ></textarea>
-
-    <button class="btn btn-record" onclick="startVoiceInput()">
-      音声入力
-    </button>
-
-  </div>
-
-  <div class="form-section">
-
-    <h3>写真</h3>
-
-    <p class="note">
-      ※ 写真は、別で撮影してください
-    </p>
-
-  </div>
-
-  <button class="btn btn-save" onclick="saveVisit()">
-    保存する
-  </button>
-
-  <button
-    class="btn btn-delete-visit"
-    id="btn-delete-visit"
-    onclick="deleteCurrentVisit()"
-    style="display:none;"
-  >
-    この記録を削除
-  </button>
-
-  <div style="height:80px;"></div>
-
-</div>
-
-<div id="screen-customers" class="screen">
-
-  <button
-    class="btn btn-save"
-    onclick="showAddCustomer()"
-    style="margin-bottom:16px;"
-  >
-    + お客様を追加
-  </button>
-
-  <div id="customer-list"></div>
-
-  <div id="customer-form" style="display:none;">
-
-    <div
-      class="form-section"
-      style="border:2px solid #1565c0;margin-top:16px;"
-    >
-
-      <h3 id="customer-form-title">
-        お客様を追加
-      </h3>
-
-      <label class="field-label">
-        お客様名 ※必須
-      </label>
-
-      <input
-        type="text"
-        id="c-name"
-        placeholder="例：山田太郎"
-      >
-
-      <label class="field-label">
-        住所
-      </label>
-
-      <input
-        type="text"
-        id="c-address"
-        placeholder="例：福島県郡山市〇〇1-2-3"
-      >
-
-      <label class="field-label">
-        電話番号
-      </label>
-
-      <input
-        type="tel"
-        id="c-phone"
-        placeholder="例：024-000-0000"
-      >
-
-      <label class="field-label">
-        備考
-      </label>
-
-      <textarea
-        id="c-note"const STORE_KEY = "syuccho_repair_v1";
-
-function getData() {
-  return JSON.parse(localStorage.getItem(STORE_KEY)) || { visits: [] };
-}
-
-function setData(data) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(data));
-}
-
-let currentScreen = "calendar";
-let selectedDate = null;
-let editingVisitId = null;
-let calYear, calMonth;
-
-function showScreen(name, title) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById("screen-" + name).classList.add("active");
-  document.getElementById("page-title").textContent = title;
-  document.getElementById("btn-back").classList.toggle("hidden", name === "calendar");
-  currentScreen = name;
-}
-
-function goBack() {
-  if (currentScreen === "form") {
-    showScreen("day", formatDateLabel(selectedDate));
-    renderDayDetail(selectedDate);
-  } else {
-    showScreen("calendar", "出張修理くん");
-    renderCalendar();
-  }
-}
-
-function initCalendar() {
-  const now = new Date();
-  calYear = now.getFullYear();
-  calMonth = now.getMonth();
-  renderCalendar();
-}
-
-function prevMonth() {
-  calMonth--;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
-  renderCalendar();
-}
-
-function nextMonth() {
-  calMonth++;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  renderCalendar();
-}
-
-function renderCalendar() {
-  const data = getData();
-  document.getElementById("month-label").textContent = `${calYear}年${calMonth + 1}月`;
-
-  const first = new Date(calYear, calMonth, 1).getDay();
-  const last = new Date(calYear, calMonth + 1, 0).getDate();
-
-  let html = ["日","月","火","水","木","金","土"]
-    .map(d => `<div class="cal-header">${d}</div>`).join("");
-
-  for (let i = 0; i < first; i++) html += `<div class="cal-day empty"></div>`;
-
-  for (let d = 1; d <= last; d++) {
-    const ds = `${calYear}-${String(calMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    const has = data.visits.some(v => v.date === ds);
-    html += `
-      <div class="cal-day" onclick="selectDate('${ds}')">
-        <span class="day-num">${d}</span>
-        ${has ? '<div class="day-dot"></div>' : ''}
-      </div>`;
-  }
-
-  document.getElementById("cal-grid").innerHTML = html;
-}
-
-function formatDateLabel(ds) {
-  const d = new Date(ds);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-function selectDate(ds) {
-  selectedDate = ds;
-  showScreen("day", formatDateLabel(ds));
-  renderDayDetail(ds);
-}
-
-function renderDayDetail(ds) {
-  const data = getData();
-  const visits = data.visits.filter(v => v.date === ds);
-
-  document.getElementById("day-title").textContent =
-    `${formatDateLabel(ds)}の出張修理`;
-
-  if (visits.length === 0) {
-    document.getElementById("visit-list").innerHTML =
-      `<p>この日の修理記録はありません</p>`;
-    return;
-  }
-
-  document.getElementById("visit-list").innerHTML = visits.map(v => `
-    <div class="visit-card" onclick="editVisit('${v.id}')">
-      <div class="vc-name">${v.company || "会社名なし"}</div>
-      <div class="vc-meta">${v.person || ""} ${v.phone || ""}</div>
-      <div class="vc-meta">${v.car || ""} ${v.distance ? v.distance + "km" : ""}</div>
-      <div class="vc-meta">${v.repairText || ""}</div>
-    </div>
-  `).join("");
-}
-
-function showAddForm() {
-  editingVisitId = null;
-
-  document.getElementById("f-company").value = "";
-  document.getElementById("f-person").value = "";
-  document.getElementById("f-phone").value = "";
-  document.getElementById("f-address").value = "";
-  document.getElementById("f-gps").value = "";
-  document.getElementById("f-time").value = "";
-  document.getElementById("f-car").value = "";
-  document.getElementById("f-distance").value = "";
-  document.getElementById("f-electric").checked = false;
-  document.getElementById("f-oil").checked = false;
-  document.getElementById("f-oil-amount").value = "";
-  document.getElementById("f-oil-filter").checked = false;
-  document.getElementById("f-other").checked = false;
-  document.getElementById("f-memo").value = "";
-
-  document.getElementById("btn-delete-visit").style.display = "none";
-
-  showScreen("form", "修理記録追加");
-}
-
-function makeRepairText() {
-  const arr = [];
-  if (document.getElementById("f-electric").checked) arr.push("電気まわり");
-  if (document.getElementById("f-oil").checked) {
-    arr.push("オイル交換 " + document.getElementById("f-oil-amount").value);
-  }
-  if (document.getElementById("f-oil-filter").checked) arr.push("フィルター交換");
-  if (document.getElementById("f-other").checked) arr.push("その他");
-  return arr.join(" / ");
-}
-
-function saveVisit() {
-  const data = getData();
-
-  const visit = {
-    id: editingVisitId || "v" + Date.now(),
-    date: selectedDate,
-    company: document.getElementById("f-company").value,
-    person: document.getElementById("f-person").value,
-    phone: document.getElementById("f-phone").value,
-    address: document.getElementById("f-address").value,
-    gps: document.getElementById("f-gps").value,
-    time: document.getElementById("f-time").value,
-    car: document.getElementById("f-car").value,
-    distance: document.getElementById("f-distance").value,
-    electric: document.getElementById("f-electric").checked,
-    oil: document.getElementById("f-oil").checked,
-    oilAmount: document.getElementById("f-oil-amount").value,
-    oilFilter: document.getElementById("f-oil-filter").checked,
-    other: document.getElementById("f-other").checked,
-    repairText: makeRepairText(),
-    memo: document.getElementById("f-memo").value
-  };
-
-  if (editingVisitId) {
-    const i = data.visits.findIndex(v => v.id === editingVisitId);
-    data.visits[i] = visit;
-  } else {
-    data.visits.push(visit);
-  }
-
-  setData(data);
-  showToast("保存しました");
-  showScreen("day", formatDateLabel(selectedDate));
-  renderDayDetail(selectedDate);
-  renderCalendar();
-}
-
-function editVisit(id) {
-  const v = getData().visits.find(v => v.id === id);
-  if (!v) return;
-
-  editingVisitId = id;
-
-  document.getElementById("f-company").value = v.company || "";
-  document.getElementById("f-person").value = v.person || "";
-  document.getElementById("f-phone").value = v.phone || "";
-  document.getElementById("f-address").value = v.address || "";
-  document.getElementById("f-gps").value = v.gps || "";
-  document.getElementById("f-time").value = v.time || "";
-  document.getElementById("f-car").value = v.car || "";
-  document.getElementById("f-distance").value = v.distance || "";
-  document.getElementById("f-electric").checked = v.electric || false;
-  document.getElementById("f-oil").checked = v.oil || false;
-  document.getElementById("f-oil-amount").value = v.oilAmount || "";
-  document.getElementById("f-oil-filter").checked = v.oilFilter || false;
-  document.getElementById("f-other").checked = v.other || false;
-  document.getElementById("f-memo").value = v.memo || "";
-
-  document.getElementById("btn-delete-visit").style.display = "block";
-  showScreen("form", "修理記録編集");
-}
-
-function deleteCurrentVisit() {
-  const data = getData();
-  data.visits = data.visits.filter(v => v.id !== editingVisitId);
-  setData(data);
-  showScreen("day", formatDateLabel(selectedDate));
-  renderDayDetail(selectedDate);
-  renderCalendar();
-}
-
-function openAddressMaps() {
-  const address = document.getElementById("f-address").value;
-  if (!address) return showToast("住所を入力してください");
-  window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address));
-}
-
-function getGPS() {
-  navigator.geolocation.getCurrentPosition(pos => {
-    document.getElementById("f-gps").value =
-      pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
-    showToast("GPS取得しました");
-  });
-}
-
-function startVoiceInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = "ja-JP";
-  recognition.start();
-  recognition.onresult = e => {
-    document.getElementById("f-memo").value = e.results[0][0].transcript;
-  };
-}
-
-function showCustomers() {
-  showToast("今回は手入力式です");
-}
-
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.style.display = "block";
-  setTimeout(() => t.style.display = "none", 2000);
-}
-
-initCalendar();
-        placeholder="車種・注意点など..."
-        style="min-height:60px;"
-      ></textarea>
-
-      <div class="btn-row">
-
-        <button
-          class="btn btn-save"
-          onclick="saveCustomer()"
-          style="flex:1;"
-        >
-          保存
-        </button>
-
-        <button
-          class="btn"
-          onclick="cancelCustomerForm()"
-          style="flex:1;background:#eee;color:#333;"
-        >
-          キャンセル
-        </button>
-
+  <nav class="top-nav">
+    <button id="btn-back" class="nav-btn hidden" type="button" onclick="goBack()">&#8592;</button>
+    <h1 id="page-title">出張修理くん</h1>
+    <button id="btn-customers" class="nav-btn" type="button" onclick="showCustomers()">&#128101;</button>
+  </nav>
+
+  <main>
+    <section id="screen-calendar" class="screen active">
+      <div class="month-nav">
+        <button id="prev-month" class="month-btn" type="button" onclick="prevMonth()">&#8249;</button>
+        <h2 id="month-label"></h2>
+        <button id="next-month" class="month-btn" type="button" onclick="nextMonth()">&#8250;</button>
       </div>
 
-    </div>
+      <div id="cal-grid" class="cal-grid"></div>
+    </section>
 
-  </div>
+    <section id="screen-day" class="screen">
+      <h2 id="day-title" class="day-header"></h2>
+      <div id="visit-list"></div>
+      <button class="fab" type="button" onclick="showAddForm()">+</button>
+      <div style="height:100px;"></div>
+    </section>
 
-  <div style="height:80px;"></div>
+    <section id="screen-form" class="screen">
+      <div class="form-section">
+        <h3>出張先・GPS</h3>
 
-</div>
+        <label class="field-label" for="f-company">相手先会社名</label>
+        <input type="text" id="f-company" placeholder="例：〇〇運送">
 
-<div id="toast"></div>
+        <label class="field-label" for="f-person">担当者名</label>
+        <input type="text" id="f-person" placeholder="例：佐藤さん">
 
-<script src="script.js"></script>
+        <label class="field-label" for="f-phone">電話番号</label>
+        <input type="tel" id="f-phone" placeholder="例：090-0000-0000">
 
+        <label class="field-label" for="f-address">住所</label>
+        <input type="text" id="f-address" placeholder="例：福島県郡山市〇〇1-2-3">
+
+        <div class="btn-row">
+          <button class="btn btn-maps" type="button" onclick="openAddressMaps()">地図で開く</button>
+          <button class="btn btn-gps" type="button" onclick="getGPS()">現在地取得</button>
+        </div>
+
+        <input type="text" id="f-gps" placeholder="GPS座標（自動取得）" readonly>
+      </div>
+
+      <div class="form-section">
+        <h3>車両情報</h3>
+
+        <label class="field-label" for="f-time">作業時刻</label>
+        <input type="time" id="f-time">
+
+        <label class="field-label" for="f-car">車名</label>
+        <input type="text" id="f-car" placeholder="例：プリウス、ハイエース">
+
+        <label class="field-label" for="f-staff">自社担当者</label>
+        <input type="text" id="f-staff" placeholder="例：佐藤">
+
+        <label class="field-label" for="f-distance">走行距離</label>
+        <input type="number" id="f-distance" placeholder="例：85000">
+      </div>
+
+      <div class="form-section">
+        <h3>修理内容</h3>
+
+        <label class="check-label">
+          <input type="checkbox" id="f-electric">
+          電気まわり
+        </label>
+
+        <label class="check-label">
+          <input type="checkbox" id="f-oil">
+          オイル交換
+        </label>
+
+        <label class="field-label" for="f-oil-amount">オイル量</label>
+        <input type="text" id="f-oil-amount" placeholder="例：4.5L">
+
+        <label class="check-label">
+          <input type="checkbox" id="f-oil-filter">
+          オイルフィルター交換
+        </label>
+
+        <label class="check-label">
+          <input type="checkbox" id="f-other">
+          その他
+        </label>
+      </div>
+
+      <div class="form-section">
+        <h3>一言メモ・音声</h3>
+
+        <label class="field-label" for="f-memo">文字メモ</label>
+        <textarea id="f-memo" placeholder="修理内容・気づいたことを入力..."></textarea>
+
+        <div class="btn-row">
+          <button id="btn-record-start" class="btn btn-record" type="button" onclick="startVoiceRecording()">録音開始</button>
+          <button id="btn-record-stop" class="btn btn-stop" type="button" onclick="stopVoiceRecording()" disabled>録音停止</button>
+        </div>
+
+        <button id="btn-record-clear" class="btn btn-clear" type="button" onclick="clearVoiceRecording()" disabled>
+          録音を削除
+        </button>
+
+        <p id="record-status" class="note">録音すると、保存時にGoogleドライブへ音声ファイルとして送信されます。</p>
+        <audio id="voice-preview" controls style="display:none;"></audio>
+      </div>
+
+      <div class="form-section">
+        <h3>写真</h3>
+        <p class="note">※ 写真は、別で撮影してください</p>
+      </div>
+
+      <button id="btn-save-visit" class="btn btn-save" type="button" onclick="saveVisit()">
+        保存する
+      </button>
+
+      <button class="btn btn-delete-visit" id="btn-delete-visit" type="button" onclick="deleteCurrentVisit()" style="display:none;">
+        この記録を削除
+      </button>
+
+      <div style="height:80px;"></div>
+    </section>
+
+    <section id="screen-customers" class="screen">
+      <button class="btn btn-save" type="button" onclick="showAddCustomer()" style="margin-bottom:16px;">
+        + お客様を追加
+      </button>
+
+      <div id="customer-list"></div>
+
+      <div id="customer-form" style="display:none;">
+        <div class="form-section customer-edit">
+          <h3 id="customer-form-title">お客様を追加</h3>
+
+          <label class="field-label" for="c-name">お客様名 ※必須</label>
+          <input type="text" id="c-name" placeholder="例：山田太郎">
+
+          <label class="field-label" for="c-address">住所</label>
+          <input type="text" id="c-address" placeholder="例：福島県郡山市〇〇1-2-3">
+
+          <label class="field-label" for="c-phone">電話番号</label>
+          <input type="tel" id="c-phone" placeholder="例：024-000-0000">
+
+          <label class="field-label" for="c-note">備考</label>
+          <textarea id="c-note" placeholder="車種・注意点など..." class="small-textarea"></textarea>
+
+          <div class="btn-row">
+            <button class="btn btn-save" type="button" onclick="saveCustomer()" style="flex:1;">保存</button>
+            <button class="btn btn-cancel" type="button" onclick="cancelCustomerForm()" style="flex:1;">キャンセル</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:80px;"></div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <script src="script.js"></script>
 </body>
 </html>

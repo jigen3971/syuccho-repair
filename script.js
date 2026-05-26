@@ -2,7 +2,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzCshuCrW2bJlduhmZTNzm8
 const STORE_KEY = "syuccho_repair_v1";
 
 function getData() {
-  return JSON.parse(localStorage.getItem(STORE_KEY)) || { visits: [] };
+  return JSON.parse(localStorage.getItem(STORE_KEY)) || { visits: [], customers: [] };
 }
 
 function setData(data) {
@@ -13,9 +13,14 @@ let currentScreen = "calendar";
 let selectedDate = null;
 let editingVisitId = null;
 let calYear, calMonth;
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedAudioBlob = null;
+let recordedAudioMimeType = "";
+let speechRecognition = null;
 
 function showScreen(name, title) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById("screen-" + name).classList.add("active");
   document.getElementById("page-title").textContent = title;
   document.getElementById("btn-back").classList.toggle("hidden", name === "calendar");
@@ -41,13 +46,19 @@ function initCalendar() {
 
 function prevMonth() {
   calMonth--;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth < 0) {
+    calMonth = 11;
+    calYear--;
+  }
   renderCalendar();
 }
 
 function nextMonth() {
   calMonth++;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth > 11) {
+    calMonth = 0;
+    calYear++;
+  }
   renderCalendar();
 }
 
@@ -58,19 +69,22 @@ function renderCalendar() {
   const first = new Date(calYear, calMonth, 1).getDay();
   const last = new Date(calYear, calMonth + 1, 0).getDate();
 
-  let html = ["日","月","火","水","木","金","土"]
-    .map(d => `<div class="cal-header">${d}</div>`).join("");
+  let html = ["日", "月", "火", "水", "木", "金", "土"]
+    .map((d) => `<div class="cal-header">${d}</div>`)
+    .join("");
 
-  for (let i = 0; i < first; i++) html += `<div class="cal-day empty"></div>`;
+  for (let i = 0; i < first; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
 
   for (let d = 1; d <= last; d++) {
-    const ds = `${calYear}-${String(calMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    const has = data.visits.some(v => v.date === ds);
+    const ds = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const has = data.visits.some((v) => v.date === ds);
     html += `
-      <div class="cal-day" onclick="selectDate('${ds}')">
+      <button class="cal-day" type="button" onclick="selectDate('${ds}')">
         <span class="day-num">${d}</span>
-        ${has ? '<div class="day-dot"></div>' : ''}
-      </div>`;
+        ${has ? '<span class="day-dot"></span>' : ""}
+      </button>`;
   }
 
   document.getElementById("cal-grid").innerHTML = html;
@@ -89,24 +103,23 @@ function selectDate(ds) {
 
 function renderDayDetail(ds) {
   const data = getData();
-  const visits = data.visits.filter(v => v.date === ds);
+  const visits = data.visits.filter((v) => v.date === ds);
 
-  document.getElementById("day-title").textContent =
-    `${formatDateLabel(ds)}の出張修理`;
+  document.getElementById("day-title").textContent = `${formatDateLabel(ds)}の出張修理`;
 
   if (visits.length === 0) {
-    document.getElementById("visit-list").innerHTML =
-      `<p>この日の修理記録はありません</p>`;
+    document.getElementById("visit-list").innerHTML = "<p>この日の修理記録はありません</p>";
     return;
   }
 
-  document.getElementById("visit-list").innerHTML = visits.map(v => `
-    <div class="visit-card" onclick="editVisit('${v.id}')">
-      <div class="vc-name">${v.company || "会社名なし"}</div>
-      <div class="vc-meta">${v.person || ""} ${v.phone || ""}</div>
-      <div class="vc-meta">${v.car || ""} ${v.distance ? v.distance + "km" : ""}</div>
-      <div class="vc-meta">${v.repairText || ""}</div>
-    </div>
+  document.getElementById("visit-list").innerHTML = visits.map((v) => `
+    <button class="visit-card" type="button" onclick="editVisit('${v.id}')">
+      <span class="vc-name">${v.company || "会社名なし"}</span>
+      <span class="vc-meta">${v.person || ""} ${v.phone || ""}</span>
+      <span class="vc-meta">${v.car || ""} ${v.distance ? v.distance + "km" : ""}</span>
+      <span class="vc-meta">${v.repairText || ""}</span>
+      ${v.audioFileName ? `<span class="vc-meta">音声あり：${v.audioFileName}</span>` : ""}
+    </button>
   `).join("");
 }
 
@@ -120,6 +133,7 @@ function showAddForm() {
   document.getElementById("f-gps").value = "";
   document.getElementById("f-time").value = "";
   document.getElementById("f-car").value = "";
+  document.getElementById("f-staff").value = "";
   document.getElementById("f-distance").value = "";
   document.getElementById("f-electric").checked = false;
   document.getElementById("f-oil").checked = false;
@@ -127,9 +141,9 @@ function showAddForm() {
   document.getElementById("f-oil-filter").checked = false;
   document.getElementById("f-other").checked = false;
   document.getElementById("f-memo").value = "";
+  clearVoiceRecording(false);
 
   document.getElementById("btn-delete-visit").style.display = "none";
-
   showScreen("form", "修理記録追加");
 }
 
@@ -144,8 +158,56 @@ function makeRepairText() {
   return arr.join(" / ");
 }
 
-function saveVisit() {
+function getAudioExtension(mimeType) {
+  if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("ogg")) return "ogg";
+  return "webm";
+}
+
+function makeAudioFileName(visit) {
+  const safeCompany = (visit.company || "company").replace(/[\\/:*?"<>|]/g, "_");
+  const safeDate = visit.date || new Date().toISOString().slice(0, 10);
+  const ext = getAudioExtension(recordedAudioMimeType);
+  return `${safeDate}_${safeCompany}_${visit.id}.${ext}`;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function buildVisitPayload(visit) {
+  const payload = {
+    mode: "saveVisit",
+    visit
+  };
+
+  if (recordedAudioBlob) {
+    const fileName = makeAudioFileName(visit);
+    payload.audio = {
+      fileName,
+      mimeType: recordedAudioMimeType || recordedAudioBlob.type || "audio/webm",
+      base64: await blobToBase64(recordedAudioBlob)
+    };
+    visit.audioFileName = fileName;
+  }
+
+  return payload;
+}
+
+async function saveVisit() {
+  const saveBtn = document.getElementById("btn-save-visit");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "保存中...";
+
   const data = getData();
+  const existingVisit = editingVisitId
+    ? data.visits.find((v) => v.id === editingVisitId)
+    : null;
 
   const visit = {
     id: editingVisitId || "v" + Date.now(),
@@ -157,6 +219,7 @@ function saveVisit() {
     gps: document.getElementById("f-gps").value,
     time: document.getElementById("f-time").value,
     car: document.getElementById("f-car").value,
+    staff: document.getElementById("f-staff").value,
     distance: document.getElementById("f-distance").value,
     electric: document.getElementById("f-electric").checked,
     oil: document.getElementById("f-oil").checked,
@@ -164,35 +227,43 @@ function saveVisit() {
     oilFilter: document.getElementById("f-oil-filter").checked,
     other: document.getElementById("f-other").checked,
     repairText: makeRepairText(),
-    memo: document.getElementById("f-memo").value
+    memo: document.getElementById("f-memo").value,
+    audioFileName: existingVisit?.audioFileName || ""
   };
 
-  if (editingVisitId) {
-    const i = data.visits.findIndex(v => v.id === editingVisitId);
-    data.visits[i] = visit;
-  } else {
-    data.visits.push(visit);
+  try {
+    const payload = await buildVisitPayload(visit);
+
+    if (editingVisitId) {
+      const i = data.visits.findIndex((v) => v.id === editingVisitId);
+      data.visits[i] = visit;
+    } else {
+      data.visits.push(visit);
+    }
+
+    setData(data);
+
+    await fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      body: JSON.stringify(payload)
+    });
+
+    showToast(recordedAudioBlob ? "保存しました。音声も送信しました" : "保存しました");
+    showScreen("day", formatDateLabel(selectedDate));
+    renderDayDetail(selectedDate);
+    renderCalendar();
+  } catch (error) {
+    console.error(error);
+    showToast("保存に失敗しました");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "保存する";
   }
-
-  setData(data);
-
-fetch(GAS_URL, {
-  method: "POST",
-  mode: "no-cors",
-  body: JSON.stringify(visit)
-});
-
-showToast("保存しました");
-
-showScreen("day", formatDateLabel(selectedDate));
-
-renderDayDetail(selectedDate);
-
-renderCalendar();
 }
 
 function editVisit(id) {
-  const v = getData().visits.find(v => v.id === id);
+  const v = getData().visits.find((visit) => visit.id === id);
   if (!v) return;
 
   editingVisitId = id;
@@ -204,6 +275,7 @@ function editVisit(id) {
   document.getElementById("f-gps").value = v.gps || "";
   document.getElementById("f-time").value = v.time || "";
   document.getElementById("f-car").value = v.car || "";
+  document.getElementById("f-staff").value = v.staff || "";
   document.getElementById("f-distance").value = v.distance || "";
   document.getElementById("f-electric").checked = v.electric || false;
   document.getElementById("f-oil").checked = v.oil || false;
@@ -211,6 +283,7 @@ function editVisit(id) {
   document.getElementById("f-oil-filter").checked = v.oilFilter || false;
   document.getElementById("f-other").checked = v.other || false;
   document.getElementById("f-memo").value = v.memo || "";
+  clearVoiceRecording(false);
 
   document.getElementById("btn-delete-visit").style.display = "block";
   showScreen("form", "修理記録編集");
@@ -218,7 +291,7 @@ function editVisit(id) {
 
 function deleteCurrentVisit() {
   const data = getData();
-  data.visits = data.visits.filter(v => v.id !== editingVisitId);
+  data.visits = data.visits.filter((v) => v.id !== editingVisitId);
   setData(data);
   showScreen("day", formatDateLabel(selectedDate));
   renderDayDetail(selectedDate);
@@ -232,32 +305,158 @@ function openAddressMaps() {
 }
 
 function getGPS() {
-  navigator.geolocation.getCurrentPosition(pos => {
+  navigator.geolocation.getCurrentPosition((pos) => {
     document.getElementById("f-gps").value =
       pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
     showToast("GPS取得しました");
   });
 }
 
-function startVoiceInput() {
+function getSupportedAudioMimeType() {
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus"
+  ];
+
+  return types.find((type) => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function startSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = "ja-JP";
-  recognition.start();
-  recognition.onresult = e => {
-    document.getElementById("f-memo").value = e.results[0][0].transcript;
+  if (!SpeechRecognition) return;
+
+  speechRecognition = new SpeechRecognition();
+  speechRecognition.lang = "ja-JP";
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+
+  speechRecognition.onresult = (event) => {
+    let transcript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    document.getElementById("f-memo").value = transcript;
   };
+
+  speechRecognition.start();
+}
+
+function stopSpeechRecognition() {
+  if (!speechRecognition) return;
+  speechRecognition.stop();
+  speechRecognition = null;
+}
+
+async function startVoiceRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast("このブラウザは録音に対応していません");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    recordedAudioBlob = null;
+    recordedAudioMimeType = getSupportedAudioMimeType();
+
+    mediaRecorder = new MediaRecorder(
+      stream,
+      recordedAudioMimeType ? { mimeType: recordedAudioMimeType } : undefined
+    );
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      recordedAudioBlob = new Blob(audioChunks, {
+        type: recordedAudioMimeType || "audio/webm"
+      });
+
+      const preview = document.getElementById("voice-preview");
+      preview.src = URL.createObjectURL(recordedAudioBlob);
+      preview.style.display = "block";
+
+      stream.getTracks().forEach((track) => track.stop());
+      document.getElementById("record-status").textContent = "録音済みです。保存するとGoogleドライブへ送信されます。";
+      document.getElementById("btn-record-clear").disabled = false;
+    };
+
+    mediaRecorder.start();
+    startSpeechRecognition();
+
+    document.getElementById("btn-record-start").disabled = true;
+    document.getElementById("btn-record-stop").disabled = false;
+    document.getElementById("btn-record-clear").disabled = true;
+    document.getElementById("record-status").textContent = "録音中です...";
+  } catch (error) {
+    console.error(error);
+    showToast("マイクの使用を許可してください");
+  }
+}
+
+function stopVoiceRecording() {
+  stopSpeechRecognition();
+
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+
+  document.getElementById("btn-record-start").disabled = false;
+  document.getElementById("btn-record-stop").disabled = true;
+}
+
+function clearVoiceRecording(showMessage = true) {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+
+  stopSpeechRecognition();
+  audioChunks = [];
+  recordedAudioBlob = null;
+  recordedAudioMimeType = "";
+
+  const preview = document.getElementById("voice-preview");
+  preview.removeAttribute("src");
+  preview.style.display = "none";
+
+  document.getElementById("btn-record-start").disabled = false;
+  document.getElementById("btn-record-stop").disabled = true;
+  document.getElementById("btn-record-clear").disabled = true;
+  document.getElementById("record-status").textContent = "録音すると、保存時にGoogleドライブへ音声ファイルとして送信されます。";
+
+  if (showMessage) {
+    showToast("録音を削除しました");
+  }
 }
 
 function showCustomers() {
   showToast("今回は手入力式です");
 }
 
+function showAddCustomer() {
+  document.getElementById("customer-form").style.display = "block";
+}
+
+function saveCustomer() {
+  showToast("今回は手入力式です");
+}
+
+function cancelCustomerForm() {
+  document.getElementById("customer-form").style.display = "none";
+}
+
 function showToast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.style.display = "block";
-  setTimeout(() => t.style.display = "none", 2000);
+  setTimeout(() => {
+    t.style.display = "none";
+  }, 2400);
 }
 
 initCalendar();
