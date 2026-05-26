@@ -1,5 +1,8 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzCshuCrW2bJlduhmZTNzm8PZhuqYUNgAJre6X4Ii462vP9zjfH88SADGm6Rl8vwBOd/exec";
 const STORE_KEY = "syuccho_repair_v1";
+const MAX_PHOTO_BYTES = 500 * 1024;
+const MAX_AUDIO_BYTES = 1200 * 1024;
+const MAX_AUDIO_SECONDS = 60;
 
 function getData() {
   return JSON.parse(localStorage.getItem(STORE_KEY)) || { visits: [], customers: [] };
@@ -196,6 +199,10 @@ async function buildVisitPayload(visit) {
   };
 
   if (recordedAudioBlob) {
+    if (recordedAudioBlob.size > MAX_AUDIO_BYTES) {
+      throw new Error("AUDIO_TOO_LARGE");
+    }
+
     const fileName = makeAudioFileName(visit);
     payload.audio = {
       fileName,
@@ -206,6 +213,10 @@ async function buildVisitPayload(visit) {
   }
 
   if (compressedPhoto) {
+    if (compressedPhoto.compressedSize > MAX_PHOTO_BYTES) {
+      throw new Error("PHOTO_TOO_LARGE");
+    }
+
     const fileName = makePhotoFileName(visit);
     payload.photo = {
       fileName,
@@ -280,7 +291,13 @@ async function saveVisit() {
     renderCalendar();
   } catch (error) {
     console.error(error);
-    showToast("保存に失敗しました");
+    if (error.message === "AUDIO_TOO_LARGE") {
+      showToast("音声が大きすぎます。短く録音してください");
+    } else if (error.message === "PHOTO_TOO_LARGE") {
+      showToast("写真が大きすぎます。別の写真を選んでください");
+    } else {
+      showToast("保存に失敗しました");
+    }
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = "保存する";
@@ -389,7 +406,10 @@ async function startVoiceRecording() {
 
     mediaRecorder = new MediaRecorder(
       stream,
-      recordedAudioMimeType ? { mimeType: recordedAudioMimeType } : undefined
+      {
+        ...(recordedAudioMimeType ? { mimeType: recordedAudioMimeType } : {}),
+        audioBitsPerSecond: 24000
+      }
     );
 
     mediaRecorder.ondataavailable = (event) => {
@@ -408,12 +428,25 @@ async function startVoiceRecording() {
       preview.style.display = "block";
 
       stream.getTracks().forEach((track) => track.stop());
-      document.getElementById("record-status").textContent = "録音済みです。保存するとGoogleドライブへ送信されます。";
+      const audioSize = formatFileSize(recordedAudioBlob.size);
+      document.getElementById("record-status").textContent =
+        `録音済みです：${audioSize}。保存するとGoogleドライブへ送信されます。`;
       document.getElementById("btn-record-clear").disabled = false;
+
+      if (recordedAudioBlob.size > MAX_AUDIO_BYTES) {
+        showToast("音声が大きすぎます。短く録音してください");
+      }
     };
 
     mediaRecorder.start();
     startSpeechRecognition();
+
+    setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        stopVoiceRecording();
+        showToast("録音は60秒で自動停止しました");
+      }
+    }, MAX_AUDIO_SECONDS * 1000);
 
     document.getElementById("btn-record-start").disabled = true;
     document.getElementById("btn-record-stop").disabled = false;
@@ -475,7 +508,7 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
-async function resizePhoto(file, maxSize = 1280, quality = 0.72) {
+async function resizePhoto(file, maxSize = 800, quality = 0.58) {
   const img = await fileToImage(file);
   const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
   const width = Math.round(img.width * scale);
@@ -488,7 +521,12 @@ async function resizePhoto(file, maxSize = 1280, quality = 0.72) {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, width, height);
 
-  const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+  let blob = await canvasToBlob(canvas, "image/jpeg", quality);
+
+  if (blob.size > MAX_PHOTO_BYTES) {
+    blob = await canvasToBlob(canvas, "image/jpeg", 0.45);
+  }
+
   const base64 = await blobToBase64(blob);
 
   return {
@@ -531,6 +569,10 @@ async function handlePhotoSelect(event) {
     document.getElementById("btn-photo-clear").disabled = false;
     document.getElementById("photo-status").textContent =
       `写真を縮小しました：${formatFileSize(compressedPhoto.originalSize)} → ${formatFileSize(compressedPhoto.compressedSize)} (${compressedPhoto.width}x${compressedPhoto.height})`;
+
+    if (compressedPhoto.compressedSize > MAX_PHOTO_BYTES) {
+      showToast("まだ写真が大きいです。別の写真を選んでください");
+    }
   } catch (error) {
     console.error(error);
     showToast("写真の縮小に失敗しました");
