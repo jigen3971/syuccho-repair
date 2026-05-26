@@ -63,6 +63,7 @@ function saveAudioToDrive(audio) {
   const bytes = Utilities.base64Decode(audio.base64);
   const blob = Utilities.newBlob(bytes, audio.mimeType || "audio/webm", audio.fileName || `voice_${Date.now()}.webm`);
   const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return file.getUrl();
 }
 
@@ -71,6 +72,7 @@ function savePhotoToDrive(photo) {
   const bytes = Utilities.base64Decode(photo.base64);
   const blob = Utilities.newBlob(bytes, photo.mimeType || "image/jpeg", photo.fileName || `photo_${Date.now()}.jpg`);
   const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return file.getUrl();
 }
 
