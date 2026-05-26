@@ -18,6 +18,7 @@ let audioChunks = [];
 let recordedAudioBlob = null;
 let recordedAudioMimeType = "";
 let speechRecognition = null;
+let compressedPhoto = null;
 
 function showScreen(name, title) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
@@ -119,6 +120,7 @@ function renderDayDetail(ds) {
       <span class="vc-meta">${v.car || ""} ${v.distance ? v.distance + "km" : ""}</span>
       <span class="vc-meta">${v.repairText || ""}</span>
       ${v.audioFileName ? `<span class="vc-meta">音声あり：${v.audioFileName}</span>` : ""}
+      ${v.photoFileName ? `<span class="vc-meta">写真あり：${v.photoFileName}</span>` : ""}
     </button>
   `).join("");
 }
@@ -142,6 +144,7 @@ function showAddForm() {
   document.getElementById("f-other").checked = false;
   document.getElementById("f-memo").value = "";
   clearVoiceRecording(false);
+  clearPhoto(false);
 
   document.getElementById("btn-delete-visit").style.display = "none";
   showScreen("form", "修理記録追加");
@@ -171,6 +174,12 @@ function makeAudioFileName(visit) {
   return `${safeDate}_${safeCompany}_${visit.id}.${ext}`;
 }
 
+function makePhotoFileName(visit) {
+  const safeCompany = (visit.company || "company").replace(/[\\/:*?"<>|]/g, "_");
+  const safeDate = visit.date || new Date().toISOString().slice(0, 10);
+  return `${safeDate}_${safeCompany}_${visit.id}.jpg`;
+}
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -194,6 +203,16 @@ async function buildVisitPayload(visit) {
       base64: await blobToBase64(recordedAudioBlob)
     };
     visit.audioFileName = fileName;
+  }
+
+  if (compressedPhoto) {
+    const fileName = makePhotoFileName(visit);
+    payload.photo = {
+      fileName,
+      mimeType: compressedPhoto.mimeType,
+      base64: compressedPhoto.base64
+    };
+    visit.photoFileName = fileName;
   }
 
   return payload;
@@ -228,7 +247,8 @@ async function saveVisit() {
     other: document.getElementById("f-other").checked,
     repairText: makeRepairText(),
     memo: document.getElementById("f-memo").value,
-    audioFileName: existingVisit?.audioFileName || ""
+    audioFileName: existingVisit?.audioFileName || "",
+    photoFileName: existingVisit?.photoFileName || ""
   };
 
   try {
@@ -249,7 +269,12 @@ async function saveVisit() {
       body: JSON.stringify(payload)
     });
 
-    showToast(recordedAudioBlob ? "保存しました。音声も送信しました" : "保存しました");
+    const sentMedia = [
+      recordedAudioBlob ? "音声" : "",
+      compressedPhoto ? "写真" : ""
+    ].filter(Boolean).join("・");
+
+    showToast(sentMedia ? `保存しました。${sentMedia}も送信しました` : "保存しました");
     showScreen("day", formatDateLabel(selectedDate));
     renderDayDetail(selectedDate);
     renderCalendar();
@@ -284,6 +309,7 @@ function editVisit(id) {
   document.getElementById("f-other").checked = v.other || false;
   document.getElementById("f-memo").value = v.memo || "";
   clearVoiceRecording(false);
+  clearPhoto(false);
 
   document.getElementById("btn-delete-visit").style.display = "block";
   showScreen("form", "修理記録編集");
@@ -431,6 +457,113 @@ function clearVoiceRecording(showMessage = true) {
 
   if (showMessage) {
     showToast("録音を削除しました");
+  }
+}
+
+function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, type, quality);
+  });
+}
+
+async function resizePhoto(file, maxSize = 1280, quality = 0.72) {
+  const img = await fileToImage(file);
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const width = Math.round(img.width * scale);
+  const height = Math.round(img.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+  const base64 = await blobToBase64(blob);
+
+  return {
+    base64,
+    blob,
+    mimeType: "image/jpeg",
+    originalSize: file.size,
+    compressedSize: blob.size,
+    width,
+    height
+  };
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+async function handlePhotoSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast("写真ファイルを選んでください");
+    clearPhoto(false);
+    return;
+  }
+
+  document.getElementById("photo-status").textContent = "写真を小さくしています...";
+
+  try {
+    compressedPhoto = await resizePhoto(file);
+
+    const preview = document.getElementById("photo-preview");
+    preview.src = URL.createObjectURL(compressedPhoto.blob);
+    preview.style.display = "block";
+
+    document.getElementById("btn-photo-clear").disabled = false;
+    document.getElementById("photo-status").textContent =
+      `写真を縮小しました：${formatFileSize(compressedPhoto.originalSize)} → ${formatFileSize(compressedPhoto.compressedSize)} (${compressedPhoto.width}x${compressedPhoto.height})`;
+  } catch (error) {
+    console.error(error);
+    showToast("写真の縮小に失敗しました");
+    clearPhoto(false);
+  }
+}
+
+function clearPhoto(showMessage = true) {
+  compressedPhoto = null;
+
+  const input = document.getElementById("f-photo");
+  if (input) {
+    input.value = "";
+  }
+
+  const preview = document.getElementById("photo-preview");
+  if (preview) {
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+  }
+
+  const clearBtn = document.getElementById("btn-photo-clear");
+  if (clearBtn) {
+    clearBtn.disabled = true;
+  }
+
+  const status = document.getElementById("photo-status");
+  if (status) {
+    status.textContent = "選択した写真は自動で小さくしてからGoogleドライブへ送信します。";
+  }
+
+  if (showMessage) {
+    showToast("写真を削除しました");
   }
 }
 

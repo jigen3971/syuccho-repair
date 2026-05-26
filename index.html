@@ -119,7 +119,13 @@
 
       <div class="form-section">
         <h3>写真</h3>
-        <p class="note">※ 写真は、別で撮影してください</p>
+        <label class="field-label" for="f-photo">写真を選択</label>
+        <input id="f-photo" type="file" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)">
+        <p id="photo-status" class="note">選択した写真は自動で小さくしてからGoogleドライブへ送信します。</p>
+        <img id="photo-preview" class="photo-preview" alt="選択した写真のプレビュー" style="display:none;">
+        <button id="btn-photo-clear" class="btn btn-clear" type="button" onclick="clearPhoto()" disabled>
+          写真を削除
+        </button>
       </div>
 
       <button id="btn-save-visit" class="btn btn-save" type="button" onclick="saveVisit()">

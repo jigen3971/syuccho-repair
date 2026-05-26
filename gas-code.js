@@ -1,19 +1,21 @@
-const SHEET_NAME = "出張修理";
+const SHEET_NAME = "出張修理記録";
 const DRIVE_FOLDER_NAME = "出張修理くん 音声";
+const PHOTO_FOLDER_NAME = "出張修理くん 写真";
 
 function doPost(e) {
   const payload = JSON.parse(e.postData.contents);
   const visit = payload.visit || payload;
   const audioUrl = payload.audio ? saveAudioToDrive(payload.audio) : "";
+  const photoUrl = payload.photo ? savePhotoToDrive(payload.photo) : "";
 
-  appendVisitToSheet(visit, audioUrl);
+  appendVisitToSheet(visit, audioUrl, photoUrl);
 
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, audioUrl }))
+    .createTextOutput(JSON.stringify({ ok: true, audioUrl, photoUrl }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function appendVisitToSheet(visit, audioUrl) {
+function appendVisitToSheet(visit, audioUrl, photoUrl) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
 
@@ -32,7 +34,8 @@ function appendVisitToSheet(visit, audioUrl) {
       "走行距離",
       "修理内容",
       "メモ",
-      "音声URL"
+      "音声URL",
+      "写真URL"
     ]);
   }
 
@@ -50,7 +53,8 @@ function appendVisitToSheet(visit, audioUrl) {
     visit.distance || "",
     visit.repairText || "",
     visit.memo || "",
-    audioUrl
+    audioUrl,
+    photoUrl
   ]);
 }
 
@@ -58,6 +62,14 @@ function saveAudioToDrive(audio) {
   const folder = getOrCreateFolder(DRIVE_FOLDER_NAME);
   const bytes = Utilities.base64Decode(audio.base64);
   const blob = Utilities.newBlob(bytes, audio.mimeType || "audio/webm", audio.fileName || `voice_${Date.now()}.webm`);
+  const file = folder.createFile(blob);
+  return file.getUrl();
+}
+
+function savePhotoToDrive(photo) {
+  const folder = getOrCreateFolder(PHOTO_FOLDER_NAME);
+  const bytes = Utilities.base64Decode(photo.base64);
+  const blob = Utilities.newBlob(bytes, photo.mimeType || "image/jpeg", photo.fileName || `photo_${Date.now()}.jpg`);
   const file = folder.createFile(blob);
   return file.getUrl();
 }
